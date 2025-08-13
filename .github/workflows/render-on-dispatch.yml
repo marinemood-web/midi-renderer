@@ -1,0 +1,43 @@
+name: Render music on dispatch
+on:
+  repository_dispatch:
+    types: [render-music]
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Run renderer (generate MP3)
+        env:
+          PHRASE: "${{ github.event.client_payload.phrase || 'autogen' }}"
+          BPM: "${{ github.event.client_payload.bpm || '120' }}"
+          # prefer token from payload (dispatched) for autonomous run; falls back to secret if present
+          TELEGRAM_BOT_TOKEN: "${{ github.event.client_payload.telegram_bot_token || secrets.TELEGRAM_BOT_TOKEN }}"
+          TARGET_CHAT_ID: "${{ github.event.client_payload.chat_id || '' }}"
+        run: |
+          node render-mp3.js "$PHRASE" $BPM out.mp3
+          ls -lh out.mp3
+
+      - name: Send MP3 to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: "${{ env.TELEGRAM_BOT_TOKEN }}"
+          TARGET_CHAT_ID: "${{ env.TARGET_CHAT_ID }}"
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ]; then echo "Missing TELEGRAM_BOT_TOKEN" ; exit 1; fi
+          if [ -z "$TARGET_CHAT_ID" ]; then echo "Missing TARGET_CHAT_ID" ; exit 1; fi
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TARGET_CHAT_ID}" \
+            -F document=@out.mp3 \
+            -F caption="Автогенерация музыки — $PHRASE (BPM=$BPM)"

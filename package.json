@@ -1,0 +1,8 @@
+{
+  "name": "mp3-renderer",
+  "version": "1.0.0",
+  "description": "Render short MP3 from phrase (synth) - used in GH Actions",
+  "main": "render-mp3.js",
+  "engines": { "node": ">=16" },
+  "scripts": {}
+}
